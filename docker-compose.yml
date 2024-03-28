@@ -1,0 +1,104 @@
+version: '3'
+
+services:
+  launchpad:
+    container_name: ${COMPOSER_NAME}_launchpad
+    hostname: ${COMPOSER_NAME}_launchpad
+    build:
+      context: ./images/launchpad
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2048M
+        reservations:
+          cpus: '0.3'
+          memory: 256M
+    ports:
+      - ${LAUNCHPAD_PORT_5300}:5300
+      - ${LAUNCHPAD_API_PORT_3000}:3000
+    volumes:
+      - ${APP_HOST_PATH}:${APP_CONTAINER_PATH}
+      - ${API_HOST_PATH}:${API_CONTAINER_PATH}
+      - ${LAUNCHPAD_HOST_PATH}/.ssh:/home/launchpad/.ssh
+      - ./images/launchpad/conf.d/:/etc/supervisor/conf.d/
+      - ./images/php-fpm/conf.d/php_ram_limit.ini:/usr/local/etc/php/conf.d/docker_php_ram_limit.ini:ro
+      - ./images/nginx/certs:/root/.certs:rw
+  nginx:
+    container_name: ${COMPOSER_NAME}_nginx
+    hostname: ${COMPOSER_NAME}_nginx
+    depends_on:
+      - php-fpm
+    build:
+      context: ./images/nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.3'
+          memory: 128M
+    ports:
+      - ${NGINX_PORT_80}:80
+      - ${NGINX_PORT_443}:443
+    volumes:
+      - ${APP_HOST_PATH}:${APP_CONTAINER_PATH}:ro
+      - ${API_HOST_PATH}:${API_CONTAINER_PATH}:ro
+      - ./images/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./images/nginx/certs:/etc/nginx/certs:ro
+      - ./volumes/nginx/logs:/var/log/nginx
+  php-fpm:
+    container_name: ${COMPOSER_NAME}_php-fpm
+    hostname: ${COMPOSER_NAME}_php-fpm
+    build:
+      context: ./images/php-fpm
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2048M
+        reservations:
+          cpus: '0.3'
+          memory: 128M
+    expose:
+      - 9000
+    volumes:
+      - ${APP_HOST_PATH}:${APP_CONTAINER_PATH}
+      - ${API_HOST_PATH}:${API_CONTAINER_PATH}
+      - ./images/php-fpm/conf.d/max_size.ini:/usr/local/etc/php/conf.d/docker_max_size.ini:ro
+      - ./images/php-fpm/conf.d/php_ram_limit.ini:/usr/local/etc/php/conf.d/docker_php_ram_limit.ini:ro
+      - ./images/php-fpm/conf.d/xdebug.ini:/usr/local/etc/php/conf.d/docker_xdebug.ini:ro
+      - ./images/php-fpm/conf.d/error_reporting.ini:/usr/local/etc/php/conf.d/docker_error_reporting.ini:ro
+      - ./volumes/xdebug/logs:/var/logs/xdebug
+    environment:
+      - PHP_IDE_CONFIG=serverName=${SERVER_NAME}
+  sonarqube:
+    container_name: ${COMPOSER_NAME}_sonarqube
+    hostname: ${COMPOSER_NAME}_sonarqube
+    image: sonarqube:latest
+    environment:
+      - SONAR_WEB_HOST:127.0.0.1
+    ports:
+      - 9000:9000
+
+#  nodejs:
+#    container_name: ${COMPOSER_NAME}_nodejs
+#    hostname: ${COMPOSER_NAME}_nodejs
+#    build:
+#      context: ./images/nodejs
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.10'
+#          memory: 1024M
+#        reservations:
+#          cpus: '0.01'
+#          memory: 16M
+#    ports:
+#      - ${NODEJS_DEV_PORT_5300}:5300
+#    volumes:
+#      - ${APP_HOST_PATH}:${APP_CONTAINER_PATH}
+#      - ${API_HOST_PATH}:${API_CONTAINER_PATH}
+#      - ${NODEJS_LANDINGPAGES_HOST_PATH}:${NODEJS_LANDINGPAGES_CONTAINER_PATH}
+#      - ./images/nodejs/conf.d/supervisord.conf:/etc/supervisord.conf
